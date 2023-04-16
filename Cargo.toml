@@ -2,6 +2,10 @@
 name = "ticking-timer"
 version = "0.1.0"
 edition = "2021"
+authors = ["G07cha"]
+license = "MIT"
+repository = "https://github.com/G07cha/ticking-timer"
+rust-version = "1.65"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
