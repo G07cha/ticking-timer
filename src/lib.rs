@@ -1,3 +1,22 @@
+//! A Ticking Timer
+//!
+//! A timer that emits channel notifications at a regular (imprecise) interval.
+//! Emitted notifications contain remaining duration and can be received synchronously in a separate thread.
+//!
+//! # Examples
+//!
+//! ```
+//! use std::time::Duration;
+//! use ticking_timer::Timer;
+//!
+//! let timer = Timer::new(Duration::from_millis(100));
+//! timer.reset(Duration::from_millis(1000));
+//! timer.resume();
+//!
+//! timer.update_receiver.recv().unwrap();
+//! let value = timer.update_receiver.recv().unwrap();
+//! assert!(value.as_millis().le(&900));
+//! ```
 use crossbeam_channel::{bounded, Receiver, SendError, Sender};
 use std::{
   sync::{Arc, Condvar, Mutex},
@@ -10,10 +29,24 @@ pub struct Timer {
   reset_sender: Sender<Option<Duration>>,
   /** Contains isRunning boolean mutex with Condvar for notifying when value changes */
   running_state: Arc<(Mutex<bool>, Condvar)>,
+  /// Crossbeam channel receiver that will receive "tick" events at a regular intervals
   pub update_receiver: Receiver<Duration>,
 }
 
 impl Timer {
+  /// Creates a new [`Timer`].
+  /// # Examples
+  ///
+  /// ```
+  /// use std::time::Duration;
+  /// use ticking_timer::Timer;
+  ///
+  /// let timer = Timer::new(Duration::from_millis(100));
+  /// ```
+  ///
+  /// # Panics
+  ///
+  /// Panics if unable to spawn a separate thread for tracking time and emitting ticks.
   pub fn new(update_frequency: Duration) -> Self {
     let running_state = Arc::new((Mutex::new(false), Condvar::new()));
     let (reset_sender, reset_receiver) = bounded::<Option<Duration>>(0);
@@ -65,19 +98,27 @@ impl Timer {
     cvar.notify_one();
   }
 
+  /// Returns the is running state of this [`Timer`].
+  ///
+  /// # Panics
+  ///
+  /// Panics if unable to acquire a lock on running state
   pub fn is_running(&self) -> bool {
     *self.running_state.0.lock().unwrap()
   }
 
+  /// Pauses this [`Timer`]. Does nothing if [`Timer`] is already paused.
   pub fn pause(&self) {
     self.set_running_state(false)
   }
 
+  /// Resumes this [`Timer`]. Does nothing if [`Timer`] is already running.
   pub fn resume(&self) {
     self.reset_sender.send(None).unwrap();
     self.set_running_state(true)
   }
 
+  /// Switches running state of this [`Timer`] from running to paused and vice versa.
   pub fn toggle(&self) {
     if self.is_running() {
       self.pause()
@@ -86,6 +127,26 @@ impl Timer {
     }
   }
 
+  /// Pauses and resets this [`Timer`] to a new duration.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use std::time::Duration;
+  /// use ticking_timer::Timer;
+  ///
+  /// let timer = Timer::new(Duration::from_millis(100));
+  /// timer.reset(Duration::from_secs(1));
+  /// timer.resume();
+  /// assert!(timer.is_running());
+  ///
+  /// timer.reset(Duration::ZERO);
+  /// assert!(!timer.is_running());
+  /// ```
+  ///
+  /// # Errors
+  ///
+  /// This function will return an error if unable to communicate with time-tracking thread.
   pub fn reset(&self, new_duration: Duration) -> Result<(), SendError<Option<Duration>>> {
     self.pause();
     self.reset_sender.send(Some(new_duration))
