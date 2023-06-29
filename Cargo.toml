@@ -1,6 +1,6 @@
 [package]
 name = "ticking-timer"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["G07cha"]
 license = "MIT"
@@ -11,3 +11,4 @@ rust-version = "1.65"
 
 [dependencies]
 crossbeam-channel = "0.5.8"
+thiserror = "1.0.40"
