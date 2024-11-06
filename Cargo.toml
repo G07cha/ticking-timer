@@ -11,4 +11,4 @@ rust-version = "1.65"
 
 [dependencies]
 crossbeam-channel = "0.5.8"
-thiserror = "1.0.40"
+thiserror = "2.0.0"
